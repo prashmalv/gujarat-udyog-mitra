@@ -62,10 +62,16 @@ function localFallback(msg, profile, language) {
   if (/grievance|payment|shikayat|delayed|nahi mila/.test(m)) {
     return `⚖️ **MSEFC route — delayed payment ke liye:**\n\n• Udyam-registered hone chahiye, payment 45+ days overdue\n• File: samadhaan.msme.gov.in\n• Legal basis: MSMED Act 2006, Sec 15-24\n• Invoice discounting: TReDS (rxil.in / m1xchange.com)`
   }
-  if (/scheme|yojana|योजना/.test(m)) {
-    return `🎯 **Top schemes for ${sector} · ${dist}:**\n\n• 🟢 **Aatmanirbhar Gujarat Sahay Yojana** — ₹5L subsidy\n• 🔵 **PM MUDRA** — ₹50K-₹20L, no collateral\n• 🔵 **PMEGP** — for new mfg units\n• 🔵 **PMFME** — 35% subsidy for food processing\n• 🔵 **CGTMSE** — collateral-free credit guarantee\n\nSource: dcmsme.gov.in/Gujarat.aspx`
+  if (/scheme|yojana|योजना|યોજના/.test(m)) {
+    return `🎯 **Top schemes for ${sector} · ${dist}:**\n\n• 🟢 **Aatmanirbhar Gujarat Sahay Yojana** — cooperative bank loan, 2% effective interest (state bears 6%). Portal: aatmanirbharguj.gujarat.gov.in\n• 🟢 **Gujarat Industrial Policy 2020** — up to 25% capex subsidy + 7% interest subvention + SGST reimbursement. Portal: ic.gujarat.gov.in\n• 🔵 **PM MUDRA** — ₹50K-₹20L, no collateral\n• 🔵 **PMEGP** — 15-35% subsidy for new mfg units\n• 🔵 **PMFME** — 35% subsidy for food processing\n• 🔵 **CGTMSE** — collateral-free credit guarantee up to ₹5Cr\n\n📘 Source: MSME Schemes Booklet 2025-26 · dcmsme.gov.in/Gujarat.aspx`
   }
-  return `🙏 Main Udyog Mitra AI hu. Aap mujhse poochho — scheme, loan, DPR, grievance, training, ya market intel. Voice me bolke bhi poochh sakte hain (🎤 icon).`
+  if (/training|skill|hunar|कौशल|कोर्स|તાલીમ|કૌશલ્ય/.test(m)) {
+    return `🎓 **Skill training routes in Gujarat:**\n\n• 🟢 **ESDP (Entrepreneurship & Skill Development Programme)** — 6-week free hands-on training in food processing, welding, carpentry, mechanical, glass, ceramics. MSME-DFO Ahmedabad + Rajkot. Portal: dcmsme.gov.in/Enterprise&skillDevelopment.htm\n• 🟢 **PM Vishwakarma** — 5-7 day basic + 15+ day advanced for 18 artisan trades. **₹500/day stipend + ₹1,000 transport + ₹15,000 toolkit**. Apply via nearest CSC.\n• 🔵 **Gujarat Skill Development Mission (KVK)** — sector-specific short courses.\n• 🔵 **NIESBUD / IIE** — entrepreneurship training.\n• 🔵 **PMKVY 4.0** — Pradhan Mantri Kaushal Vikas Yojana.\n\n📞 **MSME-DFO Ahmedabad**: 079-27540619 · dcdi-ahmbad@dcmsme.gov.in\n\n📘 Source: MSME Schemes Booklet 2025-26 · dcmsme.gov.in/Gujarat.aspx`
+  }
+  if (/dpr|project report|प्रोजेक्ट|પ્રોજેક્ટ/.test(m)) {
+    return `📄 **DPR (Detailed Project Report) banane ke liye:**\n\n1. Use the **DPR Builder** in this app — 5 conversational questions → bankable DPR.\n2. Or take a sample DPR from PMEGP portal: kviconline.gov.in/pmegpeportal (they publish sector-wise model DPRs).\n3. Approach **MSME-DFO Ahmedabad** (079-27540619) for hand-holding — free.\n\n📘 Source: MSME Schemes Booklet 2025-26 · dcmsme.gov.in/Gujarat.aspx`
+  }
+  return `🙏 **Live AI thodi der ke liye busy hai.** Aap mujhse ye poochh sakte hain — mai offline mode me bhi jawab de sakta hu:\n\n• 💰 **Loan / funding** — "₹10 lakh loan kahaan se milega"\n• 🎯 **Scheme / yojana** — "mere liye best scheme"\n• 🎓 **Skill training** — "skill training gujarat sarkar se"\n• ⚖️ **Grievance / payment** — "buyer se payment nahi mil rahi"\n• 📄 **DPR banwana**\n\nVoice icon 🎤 dabake bolke bhi poochh sakte hain (ગુજરાતી · Hindi · English).`
 }
 
 const QUICK_HI = [
@@ -130,6 +136,11 @@ export default function UdyogMitraAI() {
     const name = user?.name || profile?.name || ''
     const sector = profile?.sector || ''
     const dist = profile?.district || ''
+    if (appLanguage === 'Gujarati') {
+      return name
+        ? `નમસ્તે ${name}! 🙏 હું તમારો AI ઉદ્યોગ મિત્ર છું.${sector ? ` તમે **${sector}** માં છો${dist ? `, **${dist}** થી` : ''} — હું બધું personalise કરીશ 🎯` : ''}`
+        : `🙏 નમસ્તે! હું તમારો AI ઉદ્યોગ મિત્ર છું — Gujarat MSMEs માટે. મને પૂછો — schemes, loan, DPR, ફરિયાદ.`
+    }
     if (appLanguage === 'English') {
       return name
         ? `Hello ${name}! 🙏 I'm your AI Udyog Mitra.${sector ? ` I see you're in **${sector}**${dist ? ` at **${dist}**` : ''} — I'll tailor everything 🎯` : ''}`
@@ -345,7 +356,11 @@ export default function UdyogMitraAI() {
               ) : (
                 <>
                   <span style={{ fontSize: 20 }}>🎤</span>
-                  <span>Tap to Speak — Hindi · English · Bhojpuri samajhta hu</span>
+                  <span>
+                    {appLanguage === 'Gujarati' ? 'Tap to Speak — ગુજરાતી · Hindi · English સમજું છું'
+                    : appLanguage === 'Hindi'   ? 'Tap to Speak — Hindi · English · ગુજરાતી sab samajhta hu'
+                                                : 'Tap to Speak — Gujarati · Hindi · English (I understand all three)'}
+                  </span>
                 </>
               )}
             </button>
