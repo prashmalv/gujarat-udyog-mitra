@@ -1,0 +1,10 @@
+{
+  "name": "gujarat-udyog-mitra-api",
+  "version": "1.0.0",
+  "description": "Azure Functions API for Gujarat Udyog Mitra AI",
+  "main": "chat/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "commonjs"
+}
