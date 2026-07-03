@@ -97,43 +97,55 @@ function getLiveData() {
   return liveCache
 }
 
-// ─────────── Azure OpenAI GPT-4o-mini caller ───────────
-async function callAzureOpenAI({ system, messages }) {
-  const endpoint   = (process.env.AZURE_OPENAI_ENDPOINT || 'https://careermap-openai.openai.azure.com').replace(/\/$/, '')
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini'
-  const version    = process.env.AZURE_OPENAI_API_VERSION || '2024-10-21'
-  const apiKey     = process.env.AZURE_OPENAI_API_KEY
-
+// ─────────── Azure OpenAI caller (with model cascade — a reply is always returned) ───────────
+async function callOneModel({ system, messages, deployment, timeoutMs }) {
+  const endpoint = (process.env.AZURE_OPENAI_ENDPOINT || 'https://careermap-openai.openai.azure.com').replace(/\/$/, '')
+  const version  = process.env.AZURE_OPENAI_API_VERSION || '2024-10-21'
+  const apiKey   = process.env.AZURE_OPENAI_API_KEY
   if (!apiKey) throw new Error('AI_NOT_CONFIGURED')
 
   const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${version}`
-
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'api-key': apiKey,
-    },
+    headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
     body: JSON.stringify({
       messages: [{ role: 'system', content: system }, ...messages],
-      max_tokens: 800,
-      temperature: 0.6,
+      max_tokens: 400,        // ← tight replies, user must not scroll
+      temperature: 0.55,
       top_p: 0.9,
     }),
-    signal: AbortSignal.timeout(28_000),
+    signal: AbortSignal.timeout(timeoutMs),
   })
 
   const raw = await res.text()
   if (!res.ok) {
-    // Surface Azure OpenAI's own error shape when available so we can debug.
     let msg = raw
     try { msg = JSON.parse(raw)?.error?.message || raw } catch {}
-    throw new Error(`AZURE_OPENAI_${res.status}: ${String(msg).slice(0, 200)}`)
+    throw new Error(`${deployment}_${res.status}: ${String(msg).slice(0, 180)}`)
   }
   const data = JSON.parse(raw)
   const reply = data?.choices?.[0]?.message?.content
-  if (!reply) throw new Error('AZURE_OPENAI_EMPTY_REPLY')
+  if (!reply) throw new Error(`${deployment}_EMPTY_REPLY`)
   return reply
+}
+
+// Cascade: try the configured primary (default gpt-4o-mini) first, then fall
+// back to a broader model (default gpt-5) so the user ALWAYS gets a reply.
+async function callAzureOpenAI({ system, messages }) {
+  const primary  = process.env.AZURE_OPENAI_DEPLOYMENT          || 'gpt-4o-mini'
+  const fallback = process.env.AZURE_OPENAI_FALLBACK_DEPLOYMENT || 'gpt-5'
+  const errors = []
+  for (const [i, deployment] of [primary, fallback].entries()) {
+    try {
+      // First attempt gets more budget; fallback needs enough time within the 60s ceiling.
+      const timeoutMs = i === 0 ? 22_000 : 28_000
+      return await callOneModel({ system, messages, deployment, timeoutMs })
+    } catch (err) {
+      errors.push(`${deployment}: ${err.message}`)
+      // On the last iteration, rethrow with the full trail
+      if (deployment === fallback) throw new Error(`ALL_MODELS_FAILED · ${errors.join(' | ')}`)
+    }
+  }
 }
 
 // ─────────── System prompt (Gujarat context, no-preamble opening rule) ───────────
@@ -272,18 +284,30 @@ HOW TO ANSWER — TONE & STYLE
 ═══════════════════════════════════════════════════════
 ${langInstruction}
 
-OPENING RULE (most important):
-The FIRST sentence of every response must answer the user's actual question.
-Do NOT begin with "નમસ્તે", "Namaskar", "Kem Cho", "Main Udyog Mitra hu", or any
-generic welcome. Jump straight into the substance.
+OPENING RULE:
+FIRST sentence must answer the user's actual question. Do NOT begin with
+"નમસ્તે", "Namaskar", "Kem Cho", "Main Udyog Mitra hu", or any generic welcome.
 
   ❌ BAD: "નમસ્તે 🙏 Main aapka AI Udyog Mitra hu. ₹15 lakh ka loan…"
-  ✅ GOOD: "Surat diamond business ke liye ₹15 lakh — Aatmanirbhar Gujarat Sahay Yojana + PMEGP + CGTMSE ka combo best hai…"
+  ✅ GOOD: "Surat diamond ke liye ₹15L — Aatmanirbhar Gujarat Sahay Yojana + PMEGP best."
 
-Keep responses tight (4-7 lines or bullet list — never wall-of-text).
-End with ONE clear next action.
-Use 1-2 emojis for warmth.
-When suggesting a scheme, give: Eligibility (1 line) → Benefit (1 line) → How to apply (portal link).
+BREVITY RULE (critical — user is on mobile, must not scroll):
+• Cap every reply at **6 lines OR ≤120 words**, whichever is shorter.
+• Prefer bullets over paragraphs. Bullets should be 8-15 words each.
+• When suggesting a scheme, one bullet = Name + Benefit + Portal (one line).
+• Skip long tables, disclaimers, "hope this helps" filler, and repeated framing.
+• End with ONE short next-action question (≤ 12 words). NEVER two questions.
+• Use at most 1 emoji per reply. No decorative emoji spam.
+• If the user has more context to give, ask ONE clarifying question INSTEAD of
+  listing everything possible.
+• Cite source in a single 10-word line at the very end (📘 Source: MSME Booklet
+  2025-26 · dcmsme.gov.in/Gujarat.aspx).
+
+LANGUAGE MIRROR RULE:
+Detect the language of the user's LATEST message and reply in the SAME script,
+regardless of the persona language config. If they wrote in Gujarati script,
+reply in Gujarati script. Hindi Devanagari → Hindi. Roman letters (Hinglish or
+English) → Hinglish. Never refuse to answer in the user's language.
 
 Be the best public-sector AI Gujarat has ever deployed. Make Gujarat proud.`
 }

@@ -165,19 +165,19 @@ export default function UdyogMitraAI() {
     const newMsgs = [...history, { from: 'user', text }]
     setMsgs(newMsgs)
     setTyping(true)
-    try {
-      const reply = await callAI({ messages: newMsgs, userProfile: profile, language: appLanguageRef.current, persona })
-      setTyping(false)
-      setMsgs(prev => [...prev, { from: 'bot', text: reply }])
-    } catch (err) {
-      setTyping(false)
-      const code = err.message
-      if (code === 'AI_NOT_CONFIGURED' || code === 'AI_OVERLOADED' || code === 'AI_UNAVAILABLE') {
-        const notice = code === 'AI_OVERLOADED' ? '⚡ Live AI busy — quick offline answer:\n\n' : ''
-        setMsgs(prev => [...prev, { from: 'bot', text: notice + localFallback(text, profile, appLanguageRef.current) }])
-      } else {
-        const detail = (err && err.message) ? ` (${err.message})` : ''
-        setMsgs(prev => [...prev, { from: 'bot', text: `⚠️ Connection issue${detail}. Hard-refresh browser (Cmd+Shift+R) ya dev server restart kareiye. 🔄` }])
+    // The API now cascades gpt-4o-mini → gpt-5 internally, so a reply is
+    // guaranteed under normal conditions. If it still fails, retry once from
+    // the client before showing an error.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const reply = await callAI({ messages: newMsgs, userProfile: profile, language: appLanguageRef.current, persona })
+        setTyping(false)
+        setMsgs(prev => [...prev, { from: 'bot', text: reply }])
+        return
+      } catch (err) {
+        if (attempt === 1) continue  // silent retry
+        setTyping(false)
+        setMsgs(prev => [...prev, { from: 'bot', text: '⚡ Ek moment lagega — network hiccup. Aap thoda ruk ke phir se poochh sakte hain, ya अपना question rephrase karke bhej dijiye. 🔄' }])
       }
     }
   }
