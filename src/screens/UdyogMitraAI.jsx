@@ -170,7 +170,7 @@ export default function UdyogMitraAI() {
     // the client before showing an error.
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const reply = await callAI({ messages: newMsgs, userProfile: profile, language: appLanguageRef.current, persona })
+        const reply = await callAI({ messages: newMsgs, userProfile: profile || {}, language: appLanguageRef.current, persona })
         setTyping(false)
         setMsgs(prev => [...prev, { from: 'bot', text: reply }])
         return

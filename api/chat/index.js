@@ -324,7 +324,14 @@ module.exports = async function (context, req) {
     if (req.method === 'OPTIONS') { context.res = { status: 200, headers, body: '' }; return }
     if (req.method !== 'POST')    { context.res = { status: 405, headers, body: { error: 'Method not allowed' } }; return }
 
-    const { messages = [], userProfile = {}, language = 'English', persona = 'MSME' } = req.body || {}
+    const body = req.body || {}
+    // NOTE: destructuring defaults only apply to `undefined`, not `null`.
+    // The client may send `userProfile: null` (fresh MSME user with no saved
+    // business profile), so coerce null → {} explicitly to avoid a crash.
+    const messages = Array.isArray(body.messages) ? body.messages : []
+    const userProfile = body.userProfile || {}
+    const language = body.language || 'English'
+    const persona = body.persona || 'MSME'
 
     if (!process.env.AZURE_OPENAI_API_KEY) {
       context.res = { status: 503, headers, body: { error: 'AI_NOT_CONFIGURED' } }
